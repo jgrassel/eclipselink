@@ -371,68 +371,108 @@ public abstract class ObjectReferenceMapping extends ForeignReferenceMapping {
      */
     @Override
     public void mergeChangesIntoObject(Object target, ChangeRecord changeRecord, Object source, MergeManager mergeManager, AbstractSession targetSession) {
-        if (this.descriptor.getCachePolicy().isProtectedIsolation()&& !this.isCacheable && !targetSession.isProtectedSession()){
-            setAttributeValueInObject(target, this.indirectionPolicy.buildIndirectObject(new ValueHolder(null)));
-            return;
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: ObjectReferenceMapping.mergeChangesIntoObject() entry:\n");
+            sb.append("   arguments:\n");
+            sb.append("      target = ").append(target).append("\n");
+            sb.append("      changeRecord = ").append(changeRecord).append("\n");
+            sb.append("      source = ").append(source).append("\n");
+            sb.append("      mergeManager = ").append(mergeManager).append("\n");
+            sb.append("      targetSession = ").append(targetSession).append("\n");
+            sb.append("   this = ").append(this).append("\n");
+            sb.append("   indirectionPolicy = ").append(indirectionPolicy).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
         }
-        Object targetValueOfSource = null;
+        
+        try {
+            if (this.descriptor.getCachePolicy().isProtectedIsolation()&& !this.isCacheable && !targetSession.isProtectedSession()){
+                Object io = this.indirectionPolicy.buildIndirectObject(new ValueHolder(null));
+                System.out.println("JAG: A: Indirect Object = " + io + "\n");
+                setAttributeValueInObject(target, io);
+                
+//                setAttributeValueInObject(target, this.indirectionPolicy.buildIndirectObject(new ValueHolder(null)));
+                return;
+            }
+            Object targetValueOfSource = null;
 
-        // The target object must be completely merged before setting it otherwise
-        // another thread can pick up the partial object.
-        if (shouldMergeCascadeParts(mergeManager)) {
-            ObjectChangeSet set = (ObjectChangeSet)((ObjectReferenceChangeRecord)changeRecord).getNewValue();
-            if (set != null) {
-                if (mergeManager.shouldMergeChangesIntoDistributedCache()) {
-                    //Let's try and find it first.  We may have merged it already. In which case merge
-                    //changes will  stop the recursion
-                    targetValueOfSource = set.getTargetVersionOfSourceObject(mergeManager, targetSession, false);
-                    if ((targetValueOfSource == null) && (set.isNew() || set.isAggregate()) && set.containsChangesFromSynchronization()) {
-                        if (!mergeManager.isAlreadyMerged(set, targetSession)) {
-                            // if we haven't merged this object already then build a new object
-                            // otherwise leave it as null which will stop the recursion
-                            // CR 2855
-                            // CR 3424 Need to build the right instance based on class type instead of refernceDescriptor
-                            Class objectClass = set.getClassType(mergeManager.getSession());
-                            targetValueOfSource = mergeManager.getSession().getDescriptor(objectClass).getObjectBuilder().buildNewInstance();
-                            //Store the changeset to prevent us from creating this new object again
-                            mergeManager.recordMerge(set, targetValueOfSource, targetSession);
+            // The target object must be completely merged before setting it otherwise
+            // another thread can pick up the partial object.
+            if (shouldMergeCascadeParts(mergeManager)) {
+                System.out.println("JAG: B");
+                ObjectChangeSet set = (ObjectChangeSet)((ObjectReferenceChangeRecord)changeRecord).getNewValue();
+                if (set != null) {
+                    System.out.println("JAG: B1");
+                    if (mergeManager.shouldMergeChangesIntoDistributedCache()) {
+                        System.out.println("JAG: B2");
+                        //Let's try and find it first.  We may have merged it already. In which case merge
+                        //changes will  stop the recursion
+                        targetValueOfSource = set.getTargetVersionOfSourceObject(mergeManager, targetSession, false);
+                        if ((targetValueOfSource == null) && (set.isNew() || set.isAggregate()) && set.containsChangesFromSynchronization()) {
+                            System.out.println("JAG: B3");
+                            if (!mergeManager.isAlreadyMerged(set, targetSession)) {
+                                System.out.println("JAG: B4");
+                                // if we haven't merged this object already then build a new object
+                                // otherwise leave it as null which will stop the recursion
+                                // CR 2855
+                                // CR 3424 Need to build the right instance based on class type instead of refernceDescriptor
+                                Class objectClass = set.getClassType(mergeManager.getSession());
+                                targetValueOfSource = mergeManager.getSession().getDescriptor(objectClass).getObjectBuilder().buildNewInstance();
+                                //Store the changeset to prevent us from creating this new object again
+                                mergeManager.recordMerge(set, targetValueOfSource, targetSession);
+                            } else {
+                                //CR 4012
+                                //we have all ready created the object, must be in a cyclic
+                                //merge on a new object so get it out of the already merged collection
+                                System.out.println("JAG: B5");
+                                targetValueOfSource = mergeManager.getMergedObject(set, targetSession);
+                            }
                         } else {
-                            //CR 4012
-                            //we have all ready created the object, must be in a cyclic
-                            //merge on a new object so get it out of the already merged collection
-                            targetValueOfSource = mergeManager.getMergedObject(set, targetSession);
+                            // If We have not found it anywhere else load it from the database
+                            System.out.println("JAG: B6");
+                            targetValueOfSource = set.getTargetVersionOfSourceObject(mergeManager, targetSession, true);
+                        }
+                        if (set.containsChangesFromSynchronization()) {
+                            System.out.println("JAG: B7");
+                            mergeManager.mergeChanges(targetValueOfSource, set, targetSession);
+                        }
+                        //bug:3604593 - ensure reference not changed source is invalidated if target object not found
+                        if (targetValueOfSource == null) {
+                            System.out.println("JAG: B8");
+                          mergeManager.getSession().getIdentityMapAccessorInstance().invalidateObject(target);
+                          return;
                         }
                     } else {
-                        // If We have not found it anywhere else load it from the database
-                        targetValueOfSource = set.getTargetVersionOfSourceObject(mergeManager, targetSession, true);
+                        System.out.println("JAG: B9");
+                        mergeManager.mergeChanges(set.getUnitOfWorkClone(), set, targetSession);
                     }
-                    if (set.containsChangesFromSynchronization()) {
-                        mergeManager.mergeChanges(targetValueOfSource, set, targetSession);
-                    }
-                    //bug:3604593 - ensure reference not changed source is invalidated if target object not found
-                    if (targetValueOfSource == null) {
-                      mergeManager.getSession().getIdentityMapAccessorInstance().invalidateObject(target);
-                      return;
-                    }
-                } else {
-                    mergeManager.mergeChanges(set.getUnitOfWorkClone(), set, targetSession);
                 }
             }
-        }
-        if ((targetValueOfSource == null) && (((ObjectReferenceChangeRecord)changeRecord).getNewValue() != null)) {
-            targetValueOfSource = ((ObjectChangeSet)((ObjectReferenceChangeRecord)changeRecord).getNewValue()).getTargetVersionOfSourceObject(mergeManager, targetSession);
-        }
+            System.out.println("JAG: C");
+            if ((targetValueOfSource == null) && (((ObjectReferenceChangeRecord)changeRecord).getNewValue() != null)) {
+                System.out.println("JAG: D");
+                targetValueOfSource = ((ObjectChangeSet)((ObjectReferenceChangeRecord)changeRecord).getNewValue()).getTargetVersionOfSourceObject(mergeManager, targetSession);
+            }
 
-        // Register new object in nested units of work must not be registered into the parent,
-        // so this records them in the merge to parent case.
-        if (isPrivateOwned() && (source != null)) {
-            mergeManager.registerRemovedNewObjectIfRequired(getRealAttributeValueFromObject(source, mergeManager.getSession()));
-        }
+            // Register new object in nested units of work must not be registered into the parent,
+            // so this records them in the merge to parent case.
+            if (isPrivateOwned() && (source != null)) {
+                System.out.println("JAG: E");
+                mergeManager.registerRemovedNewObjectIfRequired(getRealAttributeValueFromObject(source, mergeManager.getSession()));
+            }
 
-        targetValueOfSource = getReferenceDescriptor().getObjectBuilder().wrapObject(targetValueOfSource, targetSession);
-        // if value holder is used, then the value holder shared with original substituted for a new ValueHolder.
-        getIndirectionPolicy().reset(target);
-        setRealAttributeValueInObject(target, targetValueOfSource);
+            System.out.println("JAG: F");
+            targetValueOfSource = getReferenceDescriptor().getObjectBuilder().wrapObject(targetValueOfSource, targetSession);
+            // if value holder is used, then the value holder shared with original substituted for a new ValueHolder.
+            getIndirectionPolicy().reset(target);
+            setRealAttributeValueInObject(target, targetValueOfSource);
+        } finally {
+            sb.setLength(0);
+            sb.append("JAG: ObjectReferenceMapping.mergeChangesIntoObject() exit:\n");
+            System.out.println(sb);
+        }
     }
 
     /**
@@ -441,95 +481,137 @@ public abstract class ObjectReferenceMapping extends ForeignReferenceMapping {
      */
     @Override
     public void mergeIntoObject(Object target, boolean isTargetUnInitialized, Object source, MergeManager mergeManager, AbstractSession targetSession) {
-        if (this.descriptor.getCachePolicy().isProtectedIsolation()&& !this.isCacheable && !targetSession.isProtectedSession()){
-            setAttributeValueInObject(target, this.indirectionPolicy.buildIndirectObject(new ValueHolder(null)));
-            return;
-        }
-        if (isTargetUnInitialized) {
-            // This will happen if the target object was removed from the cache before the commit was attempted,
-            // or for new objects.
-            if (mergeManager.shouldMergeWorkingCopyIntoOriginal()) {
-                if (!isAttributeValueInstantiated(source)) {
-                    setAttributeValueInObject(target, this.indirectionPolicy.getOriginalIndirectionObject(getAttributeValueFromObject(source), targetSession));
-                    return;
-                } else {
-                    // Must clear the old value holder to cause it to be reset.
-                    this.indirectionPolicy.reset(target);
-                }
-            }
-        }
-        if (!shouldMergeCascadeReference(mergeManager)) {
-            // This is only going to happen on mergeClone, and we should not attempt to merge the reference
-            return;
-        }
-        if (mergeManager.shouldRefreshRemoteObject() && usesIndirection()) {
-            mergeRemoteValueHolder(target, source, mergeManager);
-            return;
-        }
-        if (mergeManager.isForRefresh()) {
-            if (!isAttributeValueInstantiated(target)) {
-                // This will occur when the clone's value has not been instantiated yet and we do not need
-                // the refresh that attribute
-                if (shouldRefreshCascadeParts(mergeManager)){
-                    Object attributeValue = getAttributeValueFromObject(source);
-                    Integer refreshCascade = null;
-                    if (selectionQuery != null && selectionQuery.isObjectBuildingQuery() && ((ObjectBuildingQuery)selectionQuery).shouldRefreshIdentityMapResult()){
-                        refreshCascade = selectionQuery.getCascadePolicy();
-                    }
-                  Object clonedAttributeValue = this.indirectionPolicy.cloneAttribute(attributeValue, source, null, target, refreshCascade, mergeManager.getSession(), false); // building clone from an original not a row. 
-                    setAttributeValueInObject(target, clonedAttributeValue);
-                }
-                return;
-            }
-        } else if (!isAttributeValueInstantiated(source)) {
-            // I am merging from a clone into an original.  No need to do merge if the attribute was never
-            // modified
-            return;
-        }
-
-        Object valueOfSource = getRealAttributeValueFromObject(source, mergeManager.getSession());
-
-        Object targetValueOfSource = null;
-
-        // The target object must be completely merged before setting it otherwise
-        // another thread can pick up the partial object.
-        if (shouldMergeCascadeParts(mergeManager) && (valueOfSource != null)) {
-            if ((mergeManager.getSession().isUnitOfWork()) && (((UnitOfWorkImpl)mergeManager.getSession()).getUnitOfWorkChangeSet() != null)) {
-                // If it is a unit of work, we have to check if I have a change Set fot this object
-                Object targetValue = mergeManager.mergeChanges(mergeManager.getObjectToMerge(valueOfSource, referenceDescriptor, targetSession), (ObjectChangeSet)((UnitOfWorkChangeSet)((UnitOfWorkImpl)mergeManager.getSession()).getUnitOfWorkChangeSet()).getObjectChangeSetForClone(valueOfSource), targetSession);
-                if (target == source && targetValue != valueOfSource && (this.descriptor.getObjectChangePolicy().isObjectChangeTrackingPolicy()) && (target instanceof ChangeTracker) && (((ChangeTracker)target)._persistence_getPropertyChangeListener() != null)) {
-                    ObjectChangeListener listener = (ObjectChangeListener)((ChangeTracker)target)._persistence_getPropertyChangeListener();
-                    if (listener != null){
-                        //update the ChangeSet recorded within the parents ObjectChangeSet as the parent is referenceing the ChangeSet
-                        //for a detached or new Entity.
-                        this.descriptor.getObjectChangePolicy().updateListenerForSelfMerge(listener, this, valueOfSource, targetValue, (UnitOfWorkImpl) mergeManager.getSession());
-                    }
-                }
-        } else {
-                mergeManager.mergeChanges(mergeManager.getObjectToMerge(valueOfSource, referenceDescriptor, targetSession), null, targetSession);
-            }
-        }
-
-        if (valueOfSource != null) {
-            // Need to do this after merge so that an object exists in the database
-            targetValueOfSource = mergeManager.getTargetVersionOfSourceObject(valueOfSource, referenceDescriptor, targetSession);
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: ObjectReferenceMapping.mergeIntoObject() entry:\n");
+            sb.append("   arguments:\n");
+            sb.append("      target = ").append(target).append("\n");
+            sb.append("      isTargetUnInitialized = ").append(isTargetUnInitialized).append("\n");
+            sb.append("      source = ").append(source).append("\n");
+            sb.append("      mergeManager = ").append(mergeManager).append("\n");
+            sb.append("      targetSession = ").append(targetSession).append("\n");
+            sb.append("   this = ").append(this).append("\n");
+            sb.append("   indirectionPolicy = ").append(indirectionPolicy).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
         }
         
-        // If merge into the unit of work, must only merge and raise the event is the value changed.
-        if ((mergeManager.shouldMergeCloneIntoWorkingCopy() || mergeManager.shouldMergeCloneWithReferencesIntoWorkingCopy()) && !mergeManager.isForRefresh()
-                && this.descriptor.getObjectChangePolicy().isObjectChangeTrackingPolicy()) {
-            // Object level or attribute level so lets see if we need to raise the event?
-            Object valueOfTarget = getRealAttributeValueFromObject(target, mergeManager.getSession());
-            if (valueOfTarget != targetValueOfSource) { //equality comparison cause both are uow clones
-                this.descriptor.getObjectChangePolicy().raiseInternalPropertyChangeEvent(target, getAttributeName(), valueOfTarget, targetValueOfSource);
-            } else {
-                // No change.
+        try {
+            if (this.descriptor.getCachePolicy().isProtectedIsolation()&& !this.isCacheable && !targetSession.isProtectedSession()){
+                Object io = this.indirectionPolicy.buildIndirectObject(new ValueHolder(null));
+                System.out.println("JAG: A: Indirect Object = " + io + "\n");
+                setAttributeValueInObject(target, io);
+//                setAttributeValueInObject(target, this.indirectionPolicy.buildIndirectObject(new ValueHolder(null)));
                 return;
             }
+            if (isTargetUnInitialized) {
+                // This will happen if the target object was removed from the cache before the commit was attempted,
+                // or for new objects.
+                if (mergeManager.shouldMergeWorkingCopyIntoOriginal()) {
+                    if (!isAttributeValueInstantiated(source)) {
+                        Object io  = this.indirectionPolicy.getOriginalIndirectionObject(getAttributeValueFromObject(source), targetSession);
+                        System.out.println("JAG: B: Indirect Object = " + io + "\n");
+                        setAttributeValueInObject(target, io);
+//                        setAttributeValueInObject(target, this.indirectionPolicy.getOriginalIndirectionObject(getAttributeValueFromObject(source), targetSession));
+                        return;
+                    } else {
+                        // Must clear the old value holder to cause it to be reset.
+                        this.indirectionPolicy.reset(target);
+                    }
+                }
+            }
+            if (!shouldMergeCascadeReference(mergeManager)) {
+                // This is only going to happen on mergeClone, and we should not attempt to merge the reference
+                System.out.println("JAG: C");
+                return;
+            }
+            if (mergeManager.shouldRefreshRemoteObject() && usesIndirection()) {
+                System.out.println("JAG: D");
+                mergeRemoteValueHolder(target, source, mergeManager);
+                return;
+            }
+            if (mergeManager.isForRefresh()) {
+                System.out.println("JAG: E");
+                if (!isAttributeValueInstantiated(target)) {
+                    // This will occur when the clone's value has not been instantiated yet and we do not need
+                    // the refresh that attribute
+                    if (shouldRefreshCascadeParts(mergeManager)){
+                        Object attributeValue = getAttributeValueFromObject(source);
+                        Integer refreshCascade = null;
+                        if (selectionQuery != null && selectionQuery.isObjectBuildingQuery() && ((ObjectBuildingQuery)selectionQuery).shouldRefreshIdentityMapResult()){
+                            refreshCascade = selectionQuery.getCascadePolicy();
+                        }
+                      Object clonedAttributeValue = this.indirectionPolicy.cloneAttribute(attributeValue, source, null, target, refreshCascade, mergeManager.getSession(), false); // building clone from an original not a row. 
+                      System.out.println("JAG: C: clonedAttributeValue = " + clonedAttributeValue + "\n");  
+                      setAttributeValueInObject(target, clonedAttributeValue);
+                    }
+                    return;
+                }
+            } else if (!isAttributeValueInstantiated(source)) {
+                // I am merging from a clone into an original.  No need to do merge if the attribute was never
+                // modified
+                System.out.println("JAG: F");
+                return;
+            }
+            
+            System.out.println("JAG: G");
+
+            Object valueOfSource = getRealAttributeValueFromObject(source, mergeManager.getSession());
+
+            Object targetValueOfSource = null;
+
+            // The target object must be completely merged before setting it otherwise
+            // another thread can pick up the partial object.
+            if (shouldMergeCascadeParts(mergeManager) && (valueOfSource != null)) {
+                System.out.println("JAG: H");
+                if ((mergeManager.getSession().isUnitOfWork()) && (((UnitOfWorkImpl)mergeManager.getSession()).getUnitOfWorkChangeSet() != null)) {
+                    // If it is a unit of work, we have to check if I have a change Set fot this object
+                    Object targetValue = mergeManager.mergeChanges(mergeManager.getObjectToMerge(valueOfSource, referenceDescriptor, targetSession), (ObjectChangeSet)((UnitOfWorkChangeSet)((UnitOfWorkImpl)mergeManager.getSession()).getUnitOfWorkChangeSet()).getObjectChangeSetForClone(valueOfSource), targetSession);
+                    if (target == source && targetValue != valueOfSource && (this.descriptor.getObjectChangePolicy().isObjectChangeTrackingPolicy()) && (target instanceof ChangeTracker) && (((ChangeTracker)target)._persistence_getPropertyChangeListener() != null)) {
+                        ObjectChangeListener listener = (ObjectChangeListener)((ChangeTracker)target)._persistence_getPropertyChangeListener();
+                        if (listener != null){
+                            //update the ChangeSet recorded within the parents ObjectChangeSet as the parent is referenceing the ChangeSet
+                            //for a detached or new Entity.
+                            this.descriptor.getObjectChangePolicy().updateListenerForSelfMerge(listener, this, valueOfSource, targetValue, (UnitOfWorkImpl) mergeManager.getSession());
+                        }
+                    }
+                } else {
+                    System.out.println("JAG: I");
+                    mergeManager.mergeChanges(mergeManager.getObjectToMerge(valueOfSource, referenceDescriptor, targetSession), null, targetSession);
+                }
+            }
+
+            if (valueOfSource != null) {
+                // Need to do this after merge so that an object exists in the database
+                System.out.println("JAG: J");
+                targetValueOfSource = mergeManager.getTargetVersionOfSourceObject(valueOfSource, referenceDescriptor, targetSession);
+            }
+            
+            // If merge into the unit of work, must only merge and raise the event is the value changed.
+            if ((mergeManager.shouldMergeCloneIntoWorkingCopy() || mergeManager.shouldMergeCloneWithReferencesIntoWorkingCopy()) && !mergeManager.isForRefresh()
+                    && this.descriptor.getObjectChangePolicy().isObjectChangeTrackingPolicy()) {
+                System.out.println("JAG: K");
+                // Object level or attribute level so lets see if we need to raise the event?
+                Object valueOfTarget = getRealAttributeValueFromObject(target, mergeManager.getSession());
+                if (valueOfTarget != targetValueOfSource) { //equality comparison cause both are uow clones
+                    this.descriptor.getObjectChangePolicy().raiseInternalPropertyChangeEvent(target, getAttributeName(), valueOfTarget, targetValueOfSource);
+                } else {
+                    // No change.
+                    return;
+                }
+            }
+     
+            System.out.println("JAG: L");
+            targetValueOfSource = this.referenceDescriptor.getObjectBuilder().wrapObject(targetValueOfSource, mergeManager.getSession());
+            setRealAttributeValueInObject(target, targetValueOfSource);    
+        } finally {
+            sb.setLength(0);
+            sb.append("JAG: ObjectReferenceMapping.mergeIntoObject() exit:\n");
+            System.out.println(sb);
         }
- 
-        targetValueOfSource = this.referenceDescriptor.getObjectBuilder().wrapObject(targetValueOfSource, mergeManager.getSession());
-        setRealAttributeValueInObject(target, targetValueOfSource);
+        
+        
     }
     
     /**

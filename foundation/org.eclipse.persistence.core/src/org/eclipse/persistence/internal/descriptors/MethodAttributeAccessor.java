@@ -20,6 +20,7 @@ package org.eclipse.persistence.internal.descriptors;
 
 import java.lang.reflect.*;
 import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.security.PrivilegedActionException;
 
 import org.eclipse.persistence.exceptions.*;
@@ -230,6 +231,32 @@ public class MethodAttributeAccessor extends AttributeAccessor {
      * Sets the value of the instance variable in the object to the value.
      */
     protected void setAttributeValueInObject(Object domainObject, Object attributeValue, Object[] parameters) throws DescriptorException {
+        if ((parameters == null || parameters.length == 0 || parameters[0] == null) && (domainObject != null && !domainObject.getClass().getName().startsWith("org.eclipse.persistence")))  {
+            StringBuilder sb = new StringBuilder();
+            try {
+                sb.append("JAG: MethodAttributeAccessor.setAttributeValueInObject has detected a null argument.\n");
+                sb.append("  domainObject = ").append(domainObject).append("\n");
+                sb.append("  attributeValue = ").append(attributeValue).append("\n");
+                sb.append("  parameters = ").append(parameters).append("\n");
+                sb.append("  =====\n");
+                sb.append("  this = ").append(this).append("\n");
+                sb.append("  getSetMethod() = ").append(getSetMethod()).append("\n");
+            } catch (Throwable t) {} finally {
+                System.out.println(sb);
+                if (PrivilegedAccessHelper.shouldUsePrivilegedAccess()){
+                    try {
+                        AccessController.doPrivileged(new PrivilegedAction() {
+                            public Object run() {
+                                Thread.currentThread().dumpStack();
+                                return null;
+                            }
+                        });
+                    } catch (Throwable t) {}
+                } else {
+                    Thread.currentThread().dumpStack();
+                }
+            }
+        }
         try {
             if (PrivilegedAccessHelper.shouldUsePrivilegedAccess()){
                 try {

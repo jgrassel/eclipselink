@@ -1653,6 +1653,7 @@ public abstract class DatabaseMapping extends CoreMapping<AttributeAccessor, Abs
         } catch (DescriptorException exception) {
             exception.setMapping(this);
             throw exception;
+        } finally {
         }
     }
 
@@ -1667,6 +1668,7 @@ public abstract class DatabaseMapping extends CoreMapping<AttributeAccessor, Abs
         } catch (DescriptorException exception) {
             exception.setMapping(this);
             throw exception;
+        } finally {
         }
     }
 
