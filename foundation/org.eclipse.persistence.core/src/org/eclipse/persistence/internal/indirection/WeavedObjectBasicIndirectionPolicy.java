@@ -25,6 +25,7 @@ import org.eclipse.persistence.mappings.ForeignReferenceMapping;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.security.PrivilegedActionException;
 
 import org.eclipse.persistence.descriptors.changetracking.ChangeTracker;
@@ -53,6 +54,20 @@ public class WeavedObjectBasicIndirectionPolicy extends BasicIndirectionPolicy {
     
     public WeavedObjectBasicIndirectionPolicy(String getMethodName, String setMethodName, String actualTypeClassName, boolean hasUsedMethodAccess) {
         super();
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: WeavedObjectBasicIndirectionPolicy.ctor() entry/exit:\n");
+            sb.append("   arguments:\n");
+            sb.append("      getMethodName = ").append(getMethodName).append("\n");
+            sb.append("      setMethodName = ").append(setMethodName).append("\n");
+            sb.append("      actualTypeClassName = ").append(actualTypeClassName).append("\n");
+            sb.append("      hasUsedMethodAccess = ").append(hasUsedMethodAccess).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
+        }
+        
         this.setMethodName = setMethodName;
         this.getMethodName = getMethodName;
         this.hasUsedMethodAccess = hasUsedMethodAccess;
@@ -71,14 +86,35 @@ public class WeavedObjectBasicIndirectionPolicy extends BasicIndirectionPolicy {
      * the underlying data.
      */
     public Object getRealAttributeValueFromObject(Object object, Object attribute) {
-        boolean wasInstantiated = attribute != null && attribute instanceof ValueHolderInterface && ((ValueHolderInterface)attribute).isInstantiated();
-        Object value = super.getRealAttributeValueFromObject(object, attribute);
-        // Provide the indirection policy with a callback that allows it to do any updates it needs as the result of getting the value.
-        if (!wasInstantiated && (value != attribute)) {
-            //if the attribute was already unwrapped then do not call this method
-            updateValueInObject(object, value, attribute);
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: WeavedObjectBasicIndirectionPolicy.getRealAttributeValueFromObject() entry:\n");
+            sb.append("   arguments:\n");
+            sb.append("      object = ").append(object).append("\n");
+            sb.append("      attribute = ").append(attribute).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
         }
-        return value;
+        Object retVal = null;
+        try {
+            boolean wasInstantiated = attribute != null && attribute instanceof ValueHolderInterface && ((ValueHolderInterface)attribute).isInstantiated();
+            Object value = super.getRealAttributeValueFromObject(object, attribute);
+            // Provide the indirection policy with a callback that allows it to do any updates it needs as the result of getting the value.
+            if (!wasInstantiated && (value != attribute)) {
+                //if the attribute was already unwrapped then do not call this method
+                updateValueInObject(object, value, attribute);
+            }
+            retVal = value;
+            return value;           
+        } finally {
+            sb.setLength(0);
+            sb.append("JAG: WeavedObjectBasicIndirectionPolicy.getRealAttributeValueFromObject() exit:\n");
+            sb.append("      retVal = ").append(retVal).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+            System.out.println(sb);
+        }
     }
 
     /**
@@ -140,8 +176,29 @@ public class WeavedObjectBasicIndirectionPolicy extends BasicIndirectionPolicy {
      * initial setter method.
      */
     public void updateValueInObject(Object object, Object value, Object attributeValue){
-        setRealAttributeValueInObject(object, value);
-        ((WeavedAttributeValueHolderInterface)attributeValue).setIsCoordinatedWithProperty(true);
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: WeavedObjectBasicIndirectionPolicy.updateValueInObject() entry:\n");
+            sb.append("   arguments:\n");
+            sb.append("      object = ").append(object).append("\n");
+            sb.append("      value = ").append(value).append("\n");
+            sb.append("      attributeValue = ").append(attributeValue).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
+        }
+        try {
+            setRealAttributeValueInObject(object, value);
+            ((WeavedAttributeValueHolderInterface)attributeValue).setIsCoordinatedWithProperty(true);       
+        } finally {
+            sb.setLength(0);
+            sb.append("JAG: WeavedObjectBasicIndirectionPolicy.updateValueInObject() exit:\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+            System.out.println(sb);
+        }
+        
+        
     }
     
     /**
@@ -150,7 +207,25 @@ public class WeavedObjectBasicIndirectionPolicy extends BasicIndirectionPolicy {
      * Change tracking will be turned off when this method is called
      */
     public void setRealAttributeValueInObject(Object target, Object attributeValue) {
-        setRealAttributeValueInObject(target, attributeValue, false);
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: WeavedObjectBasicIndirectionPolicy.setRealAttributeValueInObject() entry:\n");
+            sb.append("   arguments:\n");
+            sb.append("      target = ").append(target).append("\n");
+            sb.append("      attributeValue = ").append(attributeValue).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
+        }
+        try {
+            setRealAttributeValueInObject(target, attributeValue, false);      
+        } finally {
+            sb.setLength(0);
+            sb.append("JAG: WeavedObjectBasicIndirectionPolicy.setRealAttributeValueInObject() exit:\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+            System.out.println(sb);
+        }
     }
 
     /**
@@ -159,41 +234,81 @@ public class WeavedObjectBasicIndirectionPolicy extends BasicIndirectionPolicy {
      * if trackChanges is true, set the value in the object as if the user was setting it.  Allow change tracking to pick up the change.
      */
     public void setRealAttributeValueInObject(Object target, Object attributeValue, boolean trackChanges) {
-        // If the target object is using change tracking, it must be disable first to avoid thinking the value changed.
-        PropertyChangeListener listener = null;
-        ChangeTracker trackedObject = null;
-        if (!trackChanges && target instanceof ChangeTracker) {
-            trackedObject = (ChangeTracker)target;
-            listener = trackedObject._persistence_getPropertyChangeListener();
-            trackedObject._persistence_setPropertyChangeListener(null);
-        }
-        Object[] parameters = new Object[1];
-        parameters[0] = attributeValue;
+        final StringBuilder sb = new StringBuilder();
         try {
-            if (PrivilegedAccessHelper.shouldUsePrivilegedAccess()) {
+            sb.append("JAG: WeavedObjectBasicIndirectionPolicy.setRealAttributeValueInObject() entry:\n");
+            sb.append("   arguments:\n");
+            sb.append("      target = ").append(target).append("\n");
+            sb.append("      attributeValue = ").append(attributeValue).append("\n");
+            sb.append("      trackChanges = ").append(trackChanges).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+            
+            if (PrivilegedAccessHelper.shouldUsePrivilegedAccess()){
                 try {
-                    AccessController.doPrivileged(new PrivilegedMethodInvoker(getSetMethod(), target, parameters));
-                } catch (PrivilegedActionException exception) {
-                    Exception throwableException = exception.getException();
-                    if (throwableException instanceof IllegalAccessException) {
-                        throw DescriptorException.illegalAccessWhileSettingValueThruMethodAccessor(setMethod.getName(), attributeValue, throwableException);
-                    } else {
-                        throw DescriptorException.targetInvocationWhileSettingValueThruMethodAccessor(setMethod.getName(), attributeValue, throwableException);
-                     }
-                }
+                    AccessController.doPrivileged(new PrivilegedAction() {
+                        public Object run() {
+                            StackTraceElement[] steArr = Thread.currentThread().getStackTrace();
+                            sb.append("   Stack Trace:\n");
+                            for (StackTraceElement ste : steArr) {
+                                sb.append("     ").append(ste).append("\n");
+                            }
+                            return null;
+                        }
+                    });
+                } catch (Throwable t) {}
             } else {
-                PrivilegedAccessHelper.invokeMethod(getSetMethod(), target, parameters);
+                StackTraceElement[] steArr = Thread.currentThread().getStackTrace();
+                sb.append("   Stack Trace:\n");
+                for (StackTraceElement ste : steArr) {
+                    sb.append("     ").append(ste).append("\n");
+                }
             }
-        } catch (IllegalAccessException exception) {
-            throw DescriptorException.illegalAccessWhileSettingValueThruMethodAccessor(setMethod.getName(), attributeValue, exception);
-        } catch (IllegalArgumentException exception) {
-              throw DescriptorException.illegalArgumentWhileSettingValueThruMethodAccessor(setMethod.getName(), attributeValue, exception);
-        } catch (InvocationTargetException exception) {
-            throw DescriptorException.targetInvocationWhileSettingValueThruMethodAccessor(setMethod.getName(), attributeValue, exception);
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
+        }
+        try {
+         // If the target object is using change tracking, it must be disable first to avoid thinking the value changed.
+            PropertyChangeListener listener = null;
+            ChangeTracker trackedObject = null;
+            if (!trackChanges && target instanceof ChangeTracker) {
+                trackedObject = (ChangeTracker)target;
+                listener = trackedObject._persistence_getPropertyChangeListener();
+                trackedObject._persistence_setPropertyChangeListener(null);
+            }
+            Object[] parameters = new Object[1];
+            parameters[0] = attributeValue;
+            try {
+                if (PrivilegedAccessHelper.shouldUsePrivilegedAccess()) {
+                    try {
+                        AccessController.doPrivileged(new PrivilegedMethodInvoker(getSetMethod(), target, parameters));
+                    } catch (PrivilegedActionException exception) {
+                        Exception throwableException = exception.getException();
+                        if (throwableException instanceof IllegalAccessException) {
+                            throw DescriptorException.illegalAccessWhileSettingValueThruMethodAccessor(setMethod.getName(), attributeValue, throwableException);
+                        } else {
+                            throw DescriptorException.targetInvocationWhileSettingValueThruMethodAccessor(setMethod.getName(), attributeValue, throwableException);
+                         }
+                    }
+                } else {
+                    PrivilegedAccessHelper.invokeMethod(getSetMethod(), target, parameters);
+                }
+            } catch (IllegalAccessException exception) {
+                throw DescriptorException.illegalAccessWhileSettingValueThruMethodAccessor(setMethod.getName(), attributeValue, exception);
+            } catch (IllegalArgumentException exception) {
+                  throw DescriptorException.illegalArgumentWhileSettingValueThruMethodAccessor(setMethod.getName(), attributeValue, exception);
+            } catch (InvocationTargetException exception) {
+                throw DescriptorException.targetInvocationWhileSettingValueThruMethodAccessor(setMethod.getName(), attributeValue, exception);
+            } finally {
+                if (!trackChanges && trackedObject != null) {
+                    trackedObject._persistence_setPropertyChangeListener(listener);
+                }
+            }
         } finally {
-            if (!trackChanges && trackedObject != null) {
-                trackedObject._persistence_setPropertyChangeListener(listener);
-            }
+            sb.setLength(0);
+            sb.append("JAG: WeavedObjectBasicIndirectionPolicy.setRealAttributeValueInObject() exit:\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+            System.out.println(sb);
         }
     }
     

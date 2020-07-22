@@ -44,6 +44,8 @@ import org.eclipse.persistence.internal.sessions.UnitOfWorkImpl;
  */
 public class BasicIndirectionPolicy extends IndirectionPolicy {
 
+    protected final String jagIdent = new String(this.getClass().getName() + "@" + Integer.toString(System.identityHashCode(this), 16));
+
     /**
      * INTERNAL:
      * Construct a new indirection policy.
@@ -83,6 +85,17 @@ public class BasicIndirectionPolicy extends IndirectionPolicy {
      */
     
     public Object buildIndirectObject(ValueHolderInterface valueHolder){
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: BasicIndirectionPolicy.buildIndirectObject() entry/exit:\n");
+            sb.append("   arguments:\n");
+            sb.append("      valueHolder = ").append(valueHolder).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
+        }
+        
         return valueHolder;
     }
 
@@ -196,7 +209,30 @@ public class BasicIndirectionPolicy extends IndirectionPolicy {
      */
     @Override
     public Object getOriginalIndirectionObject(Object unitOfWorkIndirectionObject, AbstractSession session) {
-        return this.getOriginalValueHolder(unitOfWorkIndirectionObject, session);
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: BasicIndirectionPolicy.getOriginalIndirectionObject() entry:\n");
+            sb.append("   arguments:\n");
+            sb.append("      unitOfWorkIndirectionObject = ").append(unitOfWorkIndirectionObject).append("\n");
+            sb.append("      session = ").append(session).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
+        }
+        
+        Object retVal = null;
+        try {
+            retVal = this.getOriginalValueHolder(unitOfWorkIndirectionObject, session);
+            return retVal;
+//            return this.getOriginalValueHolder(unitOfWorkIndirectionObject, session);
+        } finally {
+            sb.setLength(0);
+            sb.append("JAG: BasicIndirectionPolicy.getOriginalIndirectionObject() exit:\n");
+            sb.append("      getOriginalIndirectionObject retVal = ").append(retVal).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+            System.out.println(sb);
+        }
     }
 
     /**
@@ -205,11 +241,33 @@ public class BasicIndirectionPolicy extends IndirectionPolicy {
      */
     @Override
     public Object getOriginalIndirectionObjectForMerge(Object unitOfWorkIndirectionObject, AbstractSession session) {
-        DatabaseValueHolder holder = (DatabaseValueHolder)getOriginalIndirectionObject(unitOfWorkIndirectionObject, session);
-        if (holder != null && holder.getSession()!= null){
-            holder.setSession(session);
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: BasicIndirectionPolicy.getOriginalIndirectionObjectForMerge() entry:\n");
+            sb.append("   arguments:\n");
+            sb.append("      unitOfWorkIndirectionObject = ").append(unitOfWorkIndirectionObject).append("\n");
+            sb.append("      session = ").append(session).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
         }
-        return holder;
+        
+        Object retVal = null;
+        try {
+            DatabaseValueHolder holder = (DatabaseValueHolder)getOriginalIndirectionObject(unitOfWorkIndirectionObject, session);
+            if (holder != null && holder.getSession()!= null){
+                holder.setSession(session);
+            }
+            retVal = holder;
+            return holder;
+        } finally {
+            sb.setLength(0);
+            sb.append("JAG: BasicIndirectionPolicy.getOriginalIndirectionObjectForMerge() exit:\n");
+            sb.append("      retVal = ").append(retVal).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+            System.out.println(sb);
+        }
     }
 
     /**
@@ -219,57 +277,105 @@ public class BasicIndirectionPolicy extends IndirectionPolicy {
      */
     @Override
     public Object getOriginalValueHolder(Object unitOfWorkIndirectionObject, AbstractSession session) {
-        if ((unitOfWorkIndirectionObject instanceof UnitOfWorkValueHolder)
-                && (((UnitOfWorkValueHolder)unitOfWorkIndirectionObject).getRemoteUnitOfWork() != null)) {
-            ValueHolderInterface valueHolder = ((UnitOfWorkValueHolder) unitOfWorkIndirectionObject).getWrappedValueHolder();
-            if (valueHolder == null) {
-                // For remote session the original value holder is transient,
-                // so the value must be found in the registry or created.
-                RemoteUnitOfWork remoteUnitOfWork = (RemoteUnitOfWork)((UnitOfWorkValueHolder)unitOfWorkIndirectionObject).getRemoteUnitOfWork();
-                RemoteSessionController controller = remoteUnitOfWork.getParentSessionController();
-                ObjID id = ((UnitOfWorkValueHolder) unitOfWorkIndirectionObject).getWrappedValueHolderRemoteID();
-                if (id != null) {
-                    // This value holder may be on the server, or the client,
-                    // on the server, the controller should exists, so can lock up in it,
-                    // on the client, the id should be enough to create a new remote value holder.
-                    if (controller != null) {
-                        valueHolder = controller.getRemoteValueHolders().get(id);
-                    } else if (session.isRemoteSession()) {
-                        valueHolder = new RemoteValueHolder(id);
-                        ((RemoteValueHolder)valueHolder).setSession(session);
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: BasicIndirectionPolicy.getOriginalValueHolder() entry:\n");
+            sb.append("   arguments:\n");
+            sb.append("      unitOfWorkIndirectionObject = ").append(unitOfWorkIndirectionObject).append("\n");
+            sb.append("      session = ").append(session).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
+        }
+        
+        Object retVal = null;
+        try {
+            if ((unitOfWorkIndirectionObject instanceof UnitOfWorkValueHolder)
+                    && (((UnitOfWorkValueHolder)unitOfWorkIndirectionObject).getRemoteUnitOfWork() != null)) {
+                System.out.println("JAG: A");
+                ValueHolderInterface valueHolder = ((UnitOfWorkValueHolder) unitOfWorkIndirectionObject).getWrappedValueHolder();
+                if (valueHolder == null) {
+                    System.out.println("JAG: A1");
+                    // For remote session the original value holder is transient,
+                    // so the value must be found in the registry or created.
+                    RemoteUnitOfWork remoteUnitOfWork = (RemoteUnitOfWork)((UnitOfWorkValueHolder)unitOfWorkIndirectionObject).getRemoteUnitOfWork();
+                    RemoteSessionController controller = remoteUnitOfWork.getParentSessionController();
+                    ObjID id = ((UnitOfWorkValueHolder) unitOfWorkIndirectionObject).getWrappedValueHolderRemoteID();
+                    if (id != null) {
+                        System.out.println("JAG: A2");
+                        // This value holder may be on the server, or the client,
+                        // on the server, the controller should exists, so can lock up in it,
+                        // on the client, the id should be enough to create a new remote value holder.
+                        if (controller != null) {
+                            System.out.println("JAG: A3");
+                            valueHolder = controller.getRemoteValueHolders().get(id);
+                        } else if (session.isRemoteSession()) {
+                            System.out.println("JAG: A4");
+                            valueHolder = new RemoteValueHolder(id);
+                            ((RemoteValueHolder)valueHolder).setSession(session);
+                        }
+                    }
+                    if (valueHolder == null) {
+                        System.out.println("JAG: A5");
+                        // Must build a new value holder.
+                        Object object = ((UnitOfWorkValueHolder) unitOfWorkIndirectionObject).getSourceObject();
+                        AbstractRecord row = this.mapping.getDescriptor().getObjectBuilder().buildRow(object, session, WriteType.UNDEFINED);
+                        ReadObjectQuery query = new ReadObjectQuery();
+                        query.setSession(session);
+                        valueHolder = (ValueHolderInterface) this.mapping.valueFromRow(row, null, query, true);
+                    }
+                    System.out.println("JAG: A6");
+                    retVal = valueHolder;
+                    return valueHolder;
+                }
+            }
+            if (unitOfWorkIndirectionObject instanceof WrappingValueHolder) {
+                System.out.println("JAG: B");
+                ValueHolderInterface valueHolder =  ((WrappingValueHolder)unitOfWorkIndirectionObject).getWrappedValueHolder();
+                if (!session.isProtectedSession()){
+                    System.out.println("JAG: B2");
+                    while (valueHolder instanceof WrappingValueHolder && ((WrappingValueHolder)valueHolder).getWrappedValueHolder() != null){
+                        valueHolder = ((WrappingValueHolder)valueHolder).getWrappedValueHolder();
                     }
                 }
-                if (valueHolder == null) {
-                    // Must build a new value holder.
-                    Object object = ((UnitOfWorkValueHolder) unitOfWorkIndirectionObject).getSourceObject();
-                    AbstractRecord row = this.mapping.getDescriptor().getObjectBuilder().buildRow(object, session, WriteType.UNDEFINED);
-                    ReadObjectQuery query = new ReadObjectQuery();
-                    query.setSession(session);
-                    valueHolder = (ValueHolderInterface) this.mapping.valueFromRow(row, null, query, true);
+                if ((valueHolder != null) && (valueHolder instanceof DatabaseValueHolder)) {
+                    System.out.println("JAG: B3");
+                    ((DatabaseValueHolder) valueHolder).releaseWrappedValueHolder(session);
                 }
+                System.out.println("JAG: B4");
+                retVal = valueHolder;
                 return valueHolder;
+            } else {
+                System.out.println("JAG: C");
+                retVal = unitOfWorkIndirectionObject;
+                return unitOfWorkIndirectionObject;
             }
+        } finally {
+            sb.setLength(0);
+            sb.append("JAG: BasicIndirectionPolicy.getOriginalValueHolder() exit:\n");
+            sb.append("      retVal = ").append(retVal).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+            System.out.println(sb);
         }
-        if (unitOfWorkIndirectionObject instanceof WrappingValueHolder) {
-            ValueHolderInterface valueHolder =  ((WrappingValueHolder)unitOfWorkIndirectionObject).getWrappedValueHolder();
-            if (!session.isProtectedSession()){
-                while (valueHolder instanceof WrappingValueHolder && ((WrappingValueHolder)valueHolder).getWrappedValueHolder() != null){
-                    valueHolder = ((WrappingValueHolder)valueHolder).getWrappedValueHolder();
-                }
-            }
-            if ((valueHolder != null) && (valueHolder instanceof DatabaseValueHolder)) {
-                ((DatabaseValueHolder) valueHolder).releaseWrappedValueHolder(session);
-            }
-            return valueHolder;
-        } else {
-            return unitOfWorkIndirectionObject;
-        }
+        
+        
     }
     
     /**
      * Reset the wrapper used to store the value.
      */
     public void reset(Object target) {
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: BasicIndirectionPolicy.reset():\n");
+            sb.append("   arguments:\n");
+            sb.append("      target = ").append(target).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
+        }
         this.mapping.setAttributeValueInObject(target, new ValueHolder());
     }
     
@@ -279,10 +385,34 @@ public class BasicIndirectionPolicy extends IndirectionPolicy {
      * This will trigger the wrapper to instantiate the value.
      */
     public Object getRealAttributeValueFromObject(Object object, Object attribute) {
-        if (attribute instanceof ValueHolderInterface) {
-            return ((ValueHolderInterface)attribute).getValue();
-        } else {
-            return attribute;
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: BasicIndirectionPolicy.getRealAttributeValueFromObject() entry:\n");
+            sb.append("   arguments:\n");
+            sb.append("      object = ").append(object).append("\n");
+            sb.append("      attribute = ").append(attribute).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
+        }
+        
+        Object retVal = null;
+        try {
+            if (attribute instanceof ValueHolderInterface) {
+                retVal = ((ValueHolderInterface)attribute).getValue(); 
+                return retVal;
+//                return ((ValueHolderInterface)attribute).getValue();
+            } else {
+                retVal = attribute;
+                return attribute;
+            }
+        } finally {
+            sb.setLength(0);
+            sb.append("JAG: BasicIndirectionPolicy.getRealAttributeValueFromObject() exit:\n");
+            sb.append("      retVal = ").append(retVal).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+            System.out.println(sb);
         }
     }
 
@@ -292,7 +422,29 @@ public class BasicIndirectionPolicy extends IndirectionPolicy {
      * specified remote value holder.
      */
     public Object getValueFromRemoteValueHolder(RemoteValueHolder remoteValueHolder) {
-        return remoteValueHolder.getValue();
+        StringBuilder sb = new StringBuilder();
+        try {
+            sb.append("JAG: BasicIndirectionPolicy.getValueFromRemoteValueHolder() entry:\n");
+            sb.append("   arguments:\n");
+            sb.append("      remoteValueHolder = ").append(remoteValueHolder).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+        } catch (Throwable t) {} finally {
+            System.out.println(sb);
+            sb.setLength(0);
+        }
+        
+        Object retVal = null;
+        try {
+            retVal = remoteValueHolder.getValue();
+            return retVal;
+//            return remoteValueHolder.getValue();
+        } finally {
+            sb.setLength(0);
+            sb.append("JAG: BasicIndirectionPolicy.getValueFromRemoteValueHolder() exit:\n");
+            sb.append("      retVal = ").append(retVal).append("\n");
+            sb.append("   jagIdent = ").append(jagIdent).append("\n");
+            System.out.println(sb);
+        }    
     }
 
     /**
